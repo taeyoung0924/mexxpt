@@ -5926,6 +5926,49 @@
       return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
     }
 
+    async function resetAllWorkshiftWithNativeConfirm() {
+      if (!canResetAllWorkshift()) {
+        window.alert('근무표 전체 초기화는 관리자만 사용할 수 있습니다.');
+        return false;
+      }
+
+      const confirmed = window.confirm(
+        '모든 날짜의 근무계획을 전부 초기화하시겠습니까?\n삭제한 근무표는 복구할 수 없습니다.'
+      );
+
+      if (!confirmed) return false;
+
+      try {
+        if (supabaseClient && state.backend === 'supabase') {
+          const { error } = await supabaseClient
+            .from('mexx_workshift_entries')
+            .delete()
+            .not('id', 'is', null);
+
+          if (error) throw error;
+        }
+
+        state.workshiftEntries = [];
+        localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify([]));
+
+        renderWorkshift();
+
+        const allModal = document.getElementById('workshiftAllModal');
+        if (allModal && !allModal.classList.contains('hidden')) {
+          renderWorkshiftAllModal();
+        }
+
+        window.alert('근무표 전체 초기화가 완료되었습니다.');
+      } catch (error) {
+        console.error('근무표 전체 초기화 오류:', error);
+        window.alert(
+          `근무표 초기화 중 오류가 발생했습니다.\n${error.message || error}`
+        );
+      }
+
+      return false;
+    }
+
     function openWorkshiftResetAllModal() {
       if (!canResetAllWorkshift()) {
         alert('근무표 전체 초기화는 관리자만 사용할 수 있습니다.');
@@ -6636,6 +6679,12 @@ ${error.message || error}`);
 }
 .workshift-reset-front.modal {
   z-index: 2001 !important;
+}
+
+
+#workshiftResetAllBackdrop,
+#workshiftResetAllModal {
+  display: none !important;
 }
 
 </style>
@@ -7697,11 +7746,7 @@ ${error.message || error}`);
     $('workshiftAllTodayBtn').onclick = goWorkshiftAllToday;
     $('workshiftAllPrevBtn').onclick = () => changeWorkshiftAllDate(-1);
     $('workshiftAllNextBtn').onclick = () => changeWorkshiftAllDate(1);
-    $('resetAllWorkshiftBtn').onclick = openWorkshiftResetAllModal;
-    $('closeWorkshiftResetAllModalBtn').onclick = closeWorkshiftResetAllModal;
-    $('cancelWorkshiftResetAllBtn').onclick = closeWorkshiftResetAllModal;
-    $('workshiftResetAllBackdrop').onclick = closeWorkshiftResetAllModal;
-    $('confirmWorkshiftResetAllBtn').onclick = resetAllWorkshiftEntries;
+    $('resetAllWorkshiftBtn').onclick = resetAllWorkshiftWithNativeConfirm;
     // 휴지통 버튼은 HTML의 onclick에서 직접 처리합니다.
     $('closeWorkshiftDeleteDayModalBtn').onclick = closeWorkshiftDeleteDayModal;
     $('cancelWorkshiftDeleteDayBtn').onclick = closeWorkshiftDeleteDayModal;
