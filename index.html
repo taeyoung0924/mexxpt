@@ -3617,7 +3617,7 @@
     <div class="config-grid">
       <div class="field"><label for="loginName">이름</label><input type="text" id="loginName" placeholder="이름"></div>
       <div class="field"><label for="loginPhone">연락처 (뒤 4자리)</label><input type="text" id="loginPhone" placeholder="핸드폰 뒤 4자리 (예: 1234)" maxlength="4"></div>
-      <div class="field hidden"><label for="loginCode">코드</label><input type="hidden" id="loginCode" value=""></div>
+      <div class="field"><label for="loginCode">코드</label><input type="password" id="loginCode" inputmode="numeric" maxlength="4" placeholder="관리자가 부여한 코드 4자리"></div>
     </div>
     <div id="loginError" style="color:#b42318;font-size:9pt;margin:10px 0;display:none;">입력 정보가 올바르지 않습니다.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -3645,6 +3645,13 @@
     <div id="trashSettingsPanel">
       <h3>휴지통</h3>
       <div class="trash-list" id="trashList"></div>
+      <div class="workshift-reset-panel">
+        <div>
+          <strong>근무표 전체 초기화</strong>
+          <p>모든 날짜의 근무계획을 Supabase와 현재 브라우저에서 전부 삭제합니다.</p>
+        </div>
+        <button class="btn btn-danger" id="resetAllWorkshiftBtn" type="button">전체 초기화</button>
+      </div>
     </div>
     <!-- 사용자 관리 탭 -->
     <div id="userManagementPanel" style="display:none;">
@@ -3671,7 +3678,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div style="display:flex;flex-direction:column;gap:4px;">
             <label style="font-size:8.5pt;color:var(--sub);">코드 (자동 생성)</label>
-            <input type="text" id="userAddCode" value="휴대폰 뒤 4자리" readonly style="padding:6px;font-size:9pt;background:var(--input);">
+            <input type="text" id="userAddCode" placeholder="자동 생성" readonly style="padding:6px;font-size:9pt;background:var(--input);">
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;">
             <label style="font-size:8.5pt;color:var(--sub);">권한</label>
@@ -3688,7 +3695,7 @@
           </div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn btn-secondary" id="userAddCodeRegenBtn" type="button" style="flex:1;font-size:9pt;">뒤 4자리 사용</button>
+          <button class="btn btn-secondary" id="userAddCodeRegenBtn" type="button" style="flex:1;font-size:9pt;">코드 재생성</button>
           <button class="btn btn-primary" id="userAddSaveBtn" type="button" style="flex:1;font-size:9pt;">추가</button>
           <button class="btn btn-secondary" id="userAddCancelBtn" type="button" style="flex:1;font-size:9pt;">취소</button>
         </div>
@@ -3883,6 +3890,25 @@
     </div>
     <div class="workshift-month-grid-wrap hidden" id="workshiftAllCalendarWrap"></div>
     <div class="workshift-grid-wrap" id="workshiftAllBody" style="padding:0 12px;flex:1;overflow-y:auto;"></div>
+  </section>
+
+  <!-- 근무표 전체 초기화 확인 -->
+  <div class="backdrop modal-backdrop hidden workshift-modal-topmost" id="workshiftResetAllBackdrop"></div>
+  <section class="panel modal hidden workshift-modal-topmost workshift-delete-day-modal" id="workshiftResetAllModal" role="dialog" aria-modal="true" aria-labelledby="workshiftResetAllTitle">
+    <div class="modal-head">
+      <h2 id="workshiftResetAllTitle">근무표 전체 초기화</h2>
+      <button class="btn btn-secondary" id="closeWorkshiftResetAllModalBtn" type="button">닫기</button>
+    </div>
+    <p class="workshift-delete-day-message">모든 날짜의 근무계획을 전부 삭제하시겠습니까?<br>삭제한 근무표는 복구할 수 없습니다.</p>
+    <div class="field">
+      <label for="workshiftResetAllPassword">관리자 암호</label>
+      <input type="password" id="workshiftResetAllPassword" inputmode="numeric" maxlength="4" placeholder="암호 4자리">
+      <span class="workshift-delete-day-error hidden" id="workshiftResetAllError">암호가 올바르지 않습니다.</span>
+    </div>
+    <div class="workshift-delete-day-actions">
+      <button class="btn btn-danger" id="confirmWorkshiftResetAllBtn" type="button">전체 초기화</button>
+      <button class="btn btn-secondary" id="cancelWorkshiftResetAllBtn" type="button">취소</button>
+    </div>
   </section>
 
   <!-- 선택일 전체 근무 삭제 확인 -->
@@ -5876,6 +5902,46 @@
       // 한 표로 통합되어 필터 불필요
     }
 
+    function openWorkshiftResetAllModal() {
+      $('workshiftResetAllPassword').value = '';
+      $('workshiftResetAllError').classList.add('hidden');
+      $('workshiftResetAllBackdrop').classList.remove('hidden');
+      $('workshiftResetAllModal').classList.remove('hidden');
+      setTimeout(() => $('workshiftResetAllPassword').focus(), 50);
+    }
+
+    function closeWorkshiftResetAllModal() {
+      $('workshiftResetAllBackdrop').classList.add('hidden');
+      $('workshiftResetAllModal').classList.add('hidden');
+      $('workshiftResetAllPassword').value = '';
+      $('workshiftResetAllError').classList.add('hidden');
+    }
+
+    async function resetAllWorkshiftEntries() {
+      if ($('workshiftResetAllPassword').value !== WORKSHIFT_EDIT_PASSWORD) {
+        $('workshiftResetAllError').classList.remove('hidden');
+        $('workshiftResetAllPassword').focus();
+        $('workshiftResetAllPassword').select();
+        return;
+      }
+
+      try {
+        if (supabaseClient && state.backend === 'supabase') {
+          const { error } = await supabaseClient.from('mexx_workshift_entries').delete().not('id', 'is', null);
+          if (error) throw error;
+        }
+        state.workshiftEntries = [];
+        localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify([]));
+        closeWorkshiftResetAllModal();
+        renderWorkshift();
+        renderWorkshiftAllModal();
+        alert('근무표 전체 초기화가 완료되었습니다.');
+      } catch (error) {
+        console.error(error);
+        alert(`근무표 초기화 중 오류가 발생했습니다.\n${error.message || error}`);
+      }
+    }
+
     function isWorkshiftAdminUser() {
       return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
     }
@@ -6323,6 +6389,10 @@
   min-height: var(--workshift-entry-height, 40px) !important;
 }
 
+.workshift-reset-panel{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding:14px;background:var(--danger-soft);border:1px solid rgba(180,35,24,.2);border-radius:10px}
+.workshift-reset-panel strong{display:block;margin-bottom:4px;color:var(--danger)}
+.workshift-reset-panel p{margin:0;color:var(--sub);font-size:9pt;line-height:1.5}
+@media(max-width:620px){.workshift-reset-panel{align-items:stretch;flex-direction:column}}
 </style>
 </head>
 <body>
@@ -7382,6 +7452,15 @@
     $('workshiftAllTodayBtn').onclick = goWorkshiftAllToday;
     $('workshiftAllPrevBtn').onclick = () => changeWorkshiftAllDate(-1);
     $('workshiftAllNextBtn').onclick = () => changeWorkshiftAllDate(1);
+    $('resetAllWorkshiftBtn').onclick = openWorkshiftResetAllModal;
+    $('closeWorkshiftResetAllModalBtn').onclick = closeWorkshiftResetAllModal;
+    $('cancelWorkshiftResetAllBtn').onclick = closeWorkshiftResetAllModal;
+    $('workshiftResetAllBackdrop').onclick = closeWorkshiftResetAllModal;
+    $('confirmWorkshiftResetAllBtn').onclick = resetAllWorkshiftEntries;
+    $('workshiftResetAllPassword').onkeydown = event => {
+      if (event.key === 'Enter') resetAllWorkshiftEntries();
+      if (event.key === 'Escape') closeWorkshiftResetAllModal();
+    };
     $('workshiftAllDeleteDayBtn').onclick = openWorkshiftDeleteDayModal;
     $('closeWorkshiftDeleteDayModalBtn').onclick = closeWorkshiftDeleteDayModal;
     $('cancelWorkshiftDeleteDayBtn').onclick = closeWorkshiftDeleteDayModal;
@@ -7471,7 +7550,7 @@
 
     // ===== 로그인/사용자 관리 =====
     function generateCode() {
-      return '';
+      return String(Math.floor(1000 + Math.random() * 9000));
     }
 
     async function loadUsers() {
@@ -7486,7 +7565,7 @@
           id: row.id,
           name: row.name,
           phone: row.phone,
-          code: '',
+          code: row.login_code || '',
           memo: row.memo || '',
           role: row.role || 'user',
           isActive: row.is_active !== false
@@ -7515,6 +7594,7 @@
         user_id: /^[0-9a-f-]{36}$/i.test(String(user.id || '')) ? user.id : null,
         user_name: user.name,
         user_phone: user.phone,
+        user_code: user.code || '',
         user_role: user.role || 'user',
         user_memo: user.memo || '',
         user_active: user.isActive !== false
@@ -7602,13 +7682,14 @@
     $('loginSubmitBtn').onclick = async () => {
       const name = $('loginName').value.trim();
       const phone = $('loginPhone').value.replace(/[^0-9]/g, '').slice(-4);
+      const code = $('loginCode').value.replace(/[^0-9]/g, '').slice(0, 4);
 
-      if (!name || phone.length !== 4) {
+      if (!name || phone.length !== 4 || code.length !== 4) {
         $('loginError').style.display = 'block';
         return;
       }
 
-      if (name === '관리자' && phone === '0000') {
+      if (name === '관리자' && phone === '0000' && code === '1010') {
         saveLoginSession({ name: '관리자', phone: '0000', role: 'admin' }, true);
         hideLoginModal();
         renderAll();
@@ -7616,12 +7697,11 @@
       }
 
       try {
-        if (!supabaseClient || state.backend !== 'supabase') {
-          throw new Error('Supabase에 연결되지 않았습니다.');
-        }
+        if (!supabaseClient || state.backend !== 'supabase') throw new Error('Supabase에 연결되지 않았습니다.');
         const { data, error } = await supabaseClient.rpc('mexx_login', {
           login_name: name,
-          login_last4: phone
+          login_last4: phone,
+          login_code: code
         });
         if (error) throw error;
         const user = Array.isArray(data) ? data[0] : data;
@@ -7648,7 +7728,7 @@
       }
     };
 
-    [$('loginName'), $('loginPhone')].forEach(input => {
+    [$('loginName'), $('loginPhone'), $('loginCode')].forEach(input => {
       input.addEventListener('keydown', e => {
         if (e.key === 'Enter') $('loginSubmitBtn').click();
       });
@@ -7662,7 +7742,7 @@
     function showUserAddModal() {
       $('userAddName').value = '';
       $('userAddPhone').value = '';
-      $('userAddCode').value = '';
+      $('userAddCode').value = generateCode();
       $('userAddMemo').value = '';
       $('userAddRole').value = 'user';
       $('userAddFormContainer').style.display = 'block';
@@ -7673,7 +7753,7 @@
     }
 
     $('userAddCodeRegenBtn').onclick = () => {
-      $('userAddCode').value = '';
+      $('userAddCode').value = generateCode();
     };
 
     $('userAddCancelBtn').onclick = closeUserAddModal;
@@ -7681,16 +7761,17 @@
     $('userAddSaveBtn').onclick = async () => {
       const name = $('userAddName').value.trim();
       const phone = $('userAddPhone').value.trim();
+      const code = $('userAddCode').value.replace(/[^0-9]/g, '').slice(0, 4);
       const memo = $('userAddMemo').value.trim();
       const role = $('userAddRole').value;
 
-      if (!name || phone.replace(/[^0-9]/g, '').length < 4) {
-        alert('이름과 연락처를 정확히 입력해주세요.');
+      if (!name || phone.replace(/[^0-9]/g, '').length < 4 || code.length !== 4) {
+        alert('이름, 연락처, 코드 4자리를 확인해주세요.');
         return;
       }
 
       try {
-        const tempUser = { id: makeId('user'), name, phone, code: '', memo, role, isActive: true };
+        const tempUser = { id: makeId('user'), name, phone, code, memo, role, isActive: true };
         const savedId = await upsertRemoteUser(tempUser);
         tempUser.id = savedId || tempUser.id;
         state.users.push(tempUser);
@@ -7715,7 +7796,7 @@
             <td style="padding:8px;">${idx + 1}</td>
             <td style="padding:8px;">${escapeHtml(user.name)}</td>
             <td style="padding:8px;">${escapeHtml(user.phone)}</td>
-            <td style="padding:8px;"><code>${escapeHtml(String(user.phone || '').replace(/[^0-9]/g, '').slice(-4))}</code></td>
+            <td style="padding:8px;"><code>${escapeHtml(user.code || '')}</code></td>
             <td style="padding:8px;">${getRoleLabel(user.role || 'user')}</td>
             <td style="padding:8px;"></td>
             <td style="padding:8px;"></td>
@@ -7737,7 +7818,7 @@
             <td style="padding:8px;">${idx + 1}</td>
             <td style="padding:8px;">${escapeHtml(user.name)}</td>
             <td style="padding:8px;">${escapeHtml(user.phone)}</td>
-            <td style="padding:8px;"><code>${escapeHtml(String(user.phone || '').replace(/[^0-9]/g, '').slice(-4))}</code></td>
+            <td style="padding:8px;"><code>${escapeHtml(user.code || '')}</code></td>
             <td style="padding:8px;"><span style="font-size:8.5pt;${user.role === 'admin' ? 'color:var(--danger);font-weight:600;' : ''}">${getRoleLabel(user.role || 'user')}</span></td>
             <td style="padding:8px;">
               <div style="display:flex;gap:4px;align-items:center;">
