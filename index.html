@@ -5917,13 +5917,33 @@
       // 한 표로 통합되어 필터 불필요
     }
 
+    function isCurrentWorkshiftAdmin() {
+      return Boolean(
+        state.currentUser &&
+        (state.isAdmin === true || state.currentUser.role === 'admin')
+      );
+    }
+
+    function updateWorkshiftAdminControls() {
+      const allowed = isCurrentWorkshiftAdmin();
+
+      const resetPanel = document.querySelector('.workshift-reset-panel');
+      if (resetPanel) resetPanel.classList.toggle('hidden', !allowed);
+
+      const dayTrashButton = document.getElementById('workshiftAllDeleteDayBtn');
+      if (dayTrashButton) {
+        dayTrashButton.classList.toggle('hidden', !allowed);
+        dayTrashButton.disabled = !allowed;
+        dayTrashButton.setAttribute('aria-hidden', allowed ? 'false' : 'true');
+      }
+    }
+
     function updateWorkshiftResetAdminVisibility() {
-      const panel = document.querySelector('.workshift-reset-panel');
-      if (panel) panel.classList.toggle('hidden', !canResetAllWorkshift());
+      updateWorkshiftAdminControls();
     }
 
     function canResetAllWorkshift() {
-      return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
+      return isCurrentWorkshiftAdmin();
     }
 
     async function resetAllWorkshiftWithNativeConfirm() {
@@ -6010,10 +6030,15 @@
     }
 
     function isWorkshiftAdminUser() {
-      return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
+      return isCurrentWorkshiftAdmin();
     }
 
     async function deleteSelectedWorkshiftDaySimple() {
+      if (!isCurrentWorkshiftAdmin()) {
+        window.alert('전체 근무표 삭제는 관리자만 사용할 수 있습니다.');
+        return false;
+      }
+
       const confirmed = window.confirm('오늘 근무계획을 삭제하시겠습니까?');
       if (!confirmed) return false;
 
@@ -6685,6 +6710,16 @@ ${error.message || error}`);
 #workshiftResetAllBackdrop,
 #workshiftResetAllModal {
   display: none !important;
+}
+
+
+/* 전체 근무표 삭제 권한: 관리자에게만 표시 */
+#workshiftAllDeleteDayBtn.hidden {
+  display: none !important;
+}
+#workshiftAllDeleteDayBtn:disabled {
+  display: none !important;
+  pointer-events: none !important;
 }
 
 </style>
@@ -7911,7 +7946,10 @@ ${error.message || error}`);
           const now = Date.now();
           if (now - session.loginTime < SESSION_TIMEOUT) {
             state.currentUser = session.user;
-            state.isAdmin = session.isAdmin || false;
+            state.isAdmin = Boolean(
+              session.isAdmin === true || session.user?.role === 'admin'
+            );
+            updateWorkshiftAdminControls();
             resetSessionTimeout();
             return true;
           } else {
@@ -7926,7 +7964,8 @@ ${error.message || error}`);
 
     function saveLoginSession(user, isAdmin = false) {
       state.currentUser = user;
-      state.isAdmin = isAdmin;
+      state.isAdmin = Boolean(isAdmin || user?.role === 'admin');
+      updateWorkshiftAdminControls();
       localStorage.setItem(LOGIN_STORAGE, JSON.stringify({
         user,
         isAdmin,
@@ -7947,6 +7986,7 @@ ${error.message || error}`);
     function logout() {
       state.currentUser = null;
       state.isAdmin = false;
+      updateWorkshiftAdminControls();
       localStorage.removeItem(LOGIN_STORAGE);
       if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
       showLoginModal();
