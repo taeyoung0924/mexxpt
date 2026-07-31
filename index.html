@@ -3879,7 +3879,7 @@
         <button class="workshift-icon-btn" id="workshiftAllTodayBtn" type="button" style="font-size:8pt;white-space:nowrap;">오늘</button>
       </div>
       <div class="workshift-action-group">
-        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" onclick="deleteSelectedWorkshiftDaySimple(); return false;" aria-label="선택일 근무 삭제" title="선택일 근무 삭제">🗑️</button>
+        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" onclick="return window.mexxDeleteTodayWorkshift();" aria-label="선택일 근무 삭제" title="선택일 근무 삭제">🗑️</button>
         <button class="workshift-icon-btn" id="workshiftAllAddBtn" type="button" aria-label="근무 추가" title="근무 추가">+</button>
         <button class="workshift-icon-btn" id="workshiftAllEditBtn" type="button" aria-label="수정" title="수정">✎</button>
         <button class="workshift-icon-btn" id="workshiftAllRoomManageBtn" type="button" aria-label="강의실 관리" title="강의실 관리">🏢</button>
@@ -5957,34 +5957,34 @@
     }
 
     async function deleteSelectedWorkshiftDaySimple() {
-      const selectedDate = new Date(state.workshiftAllDate);
-      const selectedDateKey = formatDateInput(selectedDate);
-      const selectedWeekday = WORKSHIFT_WEEKDAY_LABELS[selectedDate.getDay()];
-      const isToday = selectedDateKey === formatDateInput(new Date());
-
-      const confirmed = window.confirm(
-        isToday
-          ? '오늘 근무계획을 삭제하시겠습니까?'
-          : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 근무계획을 삭제하시겠습니까?`
-      );
-
-      if (!confirmed) return;
-
-      const deleteIds = state.workshiftEntries
-        .filter(entry => {
-          const matchesExactDate = entry.workDate === selectedDateKey;
-          const matchesRecurringDay = !entry.workDate && entry.day === selectedWeekday;
-          return matchesExactDate || matchesRecurringDay;
-        })
-        .map(entry => entry.id);
-
-      if (!deleteIds.length) {
-        alert('삭제할 근무계획이 없습니다.');
-        return;
-      }
+      // 가장 먼저 브라우저 기본 확인창을 띄웁니다.
+      // 날짜 계산이나 Supabase 코드에서 오류가 나더라도 확인창 자체는 반드시 표시됩니다.
+      const confirmed = window.confirm('오늘 근무계획을 삭제하시겠습니까?');
+      if (!confirmed) return false;
 
       try {
-        if (supabaseClient && state.backend === 'supabase') {
+        const selectedDate =
+          state.workshiftAllDate instanceof Date && !Number.isNaN(state.workshiftAllDate.getTime())
+            ? new Date(state.workshiftAllDate)
+            : new Date();
+
+        const selectedDateKey = formatDateInput(selectedDate);
+        const selectedWeekday = WORKSHIFT_WEEKDAY_LABELS[selectedDate.getDay()];
+
+        const targets = state.workshiftEntries.filter(entry => {
+          const exactDate = String(entry.workDate || '');
+          const recurringDay = String(entry.day || '');
+          return exactDate === selectedDateKey || (!exactDate && recurringDay === selectedWeekday);
+        });
+
+        if (!targets.length) {
+          window.alert('삭제할 근무계획이 없습니다.');
+          return false;
+        }
+
+        const deleteIds = targets.map(entry => entry.id).filter(Boolean);
+
+        if (supabaseClient && state.backend === 'supabase' && deleteIds.length) {
           const { error } = await supabaseClient
             .from('mexx_workshift_entries')
             .delete()
@@ -5994,23 +5994,32 @@
         }
 
         const deleteIdSet = new Set(deleteIds);
-        state.workshiftEntries = state.workshiftEntries.filter(
-          entry => !deleteIdSet.has(entry.id)
-        );
+        state.workshiftEntries = state.workshiftEntries.filter(entry => {
+          if (entry.id && deleteIdSet.has(entry.id)) return false;
 
-        localStorage.setItem(
-          WORKSHIFT_STORAGE,
-          JSON.stringify(state.workshiftEntries)
-        );
+          const exactDate = String(entry.workDate || '');
+          const recurringDay = String(entry.day || '');
+          return !(exactDate === selectedDateKey || (!exactDate && recurringDay === selectedWeekday));
+        });
+
+        localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify(state.workshiftEntries));
 
         renderWorkshift();
-        renderWorkshiftAllModal();
-        alert('근무계획을 삭제했습니다.');
+        if (!$('workshiftAllModal').classList.contains('hidden')) {
+          renderWorkshiftAllModal();
+        }
+
+        window.alert('오늘 근무계획을 삭제했습니다.');
+        return false;
       } catch (error) {
-        console.error(error);
-        alert(`근무계획 삭제 중 오류가 발생했습니다.\n${error.message || error}`);
+        console.error('오늘 근무계획 삭제 오류:', error);
+        window.alert(`근무계획 삭제 중 오류가 발생했습니다.
+${error.message || error}`);
+        return false;
       }
     }
+
+    window.mexxDeleteTodayWorkshift = deleteSelectedWorkshiftDaySimple;
 
     function openWorkshiftDeleteDayModal() {
       const weekday = WORKSHIFT_WEEKDAY_LABELS[state.workshiftAllDate.getDay()];
@@ -6136,7 +6145,6 @@ ${error.message || error}`);
       await deleteWorkshiftScope('week');
     }
 
-    window.deleteSelectedWorkshiftDaySimple = deleteSelectedWorkshiftDaySimple;
     window.closeWorkshiftDeleteDayModal = closeWorkshiftDeleteDayModal;
     window.confirmDeleteAllWorkshiftForSelectedDay = confirmDeleteAllWorkshiftForSelectedDay;
     window.confirmDeleteAllWorkshiftForSelectedWeek = confirmDeleteAllWorkshiftForSelectedWeek;
@@ -6571,6 +6579,22 @@ ${error.message || error}`);
   .workshift-delete-scope-actions #cancelWorkshiftDeleteDayBtn {
     grid-column: 1 / -1;
   }
+}
+
+
+/* Edge 포함 브라우저에서 휴지통 클릭 영역 강제 활성화 */
+#workshiftAllDeleteDayBtn {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 999 !important;
+  touch-action: manipulation;
+}
+#workshiftAllDeleteDayBtn::before,
+#workshiftAllDeleteDayBtn::after {
+  pointer-events: none !important;
 }
 
 </style>
@@ -7641,7 +7665,17 @@ ${error.message || error}`);
       if (event.key === 'Enter') resetAllWorkshiftEntries();
       if (event.key === 'Escape') closeWorkshiftResetAllModal();
     };
-    $('workshiftAllDeleteDayBtn').onclick = deleteSelectedWorkshiftDaySimple;
+    {
+      const trashButton = document.getElementById('workshiftAllDeleteDayBtn');
+      if (trashButton) {
+        trashButton.onclick = null;
+        trashButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.mexxDeleteTodayWorkshift();
+        });
+      }
+    }
     $('closeWorkshiftDeleteDayModalBtn').onclick = closeWorkshiftDeleteDayModal;
     $('cancelWorkshiftDeleteDayBtn').onclick = closeWorkshiftDeleteDayModal;
     $('workshiftDeleteDayBackdrop').onclick = closeWorkshiftDeleteDayModal;
