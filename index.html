@@ -3879,7 +3879,7 @@
         <button class="workshift-icon-btn" id="workshiftAllTodayBtn" type="button" style="font-size:8pt;white-space:nowrap;">오늘</button>
       </div>
       <div class="workshift-action-group">
-        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" onclick="openWorkshiftDeleteDayModal(); return false;" aria-label="선택일 전체 근무 삭제" title="선택일 전체 근무 삭제">🗑️</button>
+        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" onclick="deleteSelectedWorkshiftDaySimple(); return false;" aria-label="선택일 근무 삭제" title="선택일 근무 삭제">🗑️</button>
         <button class="workshift-icon-btn" id="workshiftAllAddBtn" type="button" aria-label="근무 추가" title="근무 추가">+</button>
         <button class="workshift-icon-btn" id="workshiftAllEditBtn" type="button" aria-label="수정" title="수정">✎</button>
         <button class="workshift-icon-btn" id="workshiftAllRoomManageBtn" type="button" aria-label="강의실 관리" title="강의실 관리">🏢</button>
@@ -5956,6 +5956,62 @@
       return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
     }
 
+    async function deleteSelectedWorkshiftDaySimple() {
+      const selectedDate = new Date(state.workshiftAllDate);
+      const selectedDateKey = formatDateInput(selectedDate);
+      const selectedWeekday = WORKSHIFT_WEEKDAY_LABELS[selectedDate.getDay()];
+      const isToday = selectedDateKey === formatDateInput(new Date());
+
+      const confirmed = window.confirm(
+        isToday
+          ? '오늘 근무계획을 삭제하시겠습니까?'
+          : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 근무계획을 삭제하시겠습니까?`
+      );
+
+      if (!confirmed) return;
+
+      const deleteIds = state.workshiftEntries
+        .filter(entry => {
+          const matchesExactDate = entry.workDate === selectedDateKey;
+          const matchesRecurringDay = !entry.workDate && entry.day === selectedWeekday;
+          return matchesExactDate || matchesRecurringDay;
+        })
+        .map(entry => entry.id);
+
+      if (!deleteIds.length) {
+        alert('삭제할 근무계획이 없습니다.');
+        return;
+      }
+
+      try {
+        if (supabaseClient && state.backend === 'supabase') {
+          const { error } = await supabaseClient
+            .from('mexx_workshift_entries')
+            .delete()
+            .in('id', deleteIds);
+
+          if (error) throw error;
+        }
+
+        const deleteIdSet = new Set(deleteIds);
+        state.workshiftEntries = state.workshiftEntries.filter(
+          entry => !deleteIdSet.has(entry.id)
+        );
+
+        localStorage.setItem(
+          WORKSHIFT_STORAGE,
+          JSON.stringify(state.workshiftEntries)
+        );
+
+        renderWorkshift();
+        renderWorkshiftAllModal();
+        alert('근무계획을 삭제했습니다.');
+      } catch (error) {
+        console.error(error);
+        alert(`근무계획 삭제 중 오류가 발생했습니다.\n${error.message || error}`);
+      }
+    }
+
     function openWorkshiftDeleteDayModal() {
       const weekday = WORKSHIFT_WEEKDAY_LABELS[state.workshiftAllDate.getDay()];
       const isToday = formatDateInput(state.workshiftAllDate) === formatDateInput(new Date());
@@ -6080,7 +6136,7 @@ ${error.message || error}`);
       await deleteWorkshiftScope('week');
     }
 
-    window.openWorkshiftDeleteDayModal = openWorkshiftDeleteDayModal;
+    window.deleteSelectedWorkshiftDaySimple = deleteSelectedWorkshiftDaySimple;
     window.closeWorkshiftDeleteDayModal = closeWorkshiftDeleteDayModal;
     window.confirmDeleteAllWorkshiftForSelectedDay = confirmDeleteAllWorkshiftForSelectedDay;
     window.confirmDeleteAllWorkshiftForSelectedWeek = confirmDeleteAllWorkshiftForSelectedWeek;
@@ -7585,7 +7641,7 @@ ${error.message || error}`);
       if (event.key === 'Enter') resetAllWorkshiftEntries();
       if (event.key === 'Escape') closeWorkshiftResetAllModal();
     };
-    $('workshiftAllDeleteDayBtn').onclick = openWorkshiftDeleteDayModal;
+    $('workshiftAllDeleteDayBtn').onclick = deleteSelectedWorkshiftDaySimple;
     $('closeWorkshiftDeleteDayModalBtn').onclick = closeWorkshiftDeleteDayModal;
     $('cancelWorkshiftDeleteDayBtn').onclick = closeWorkshiftDeleteDayModal;
     $('workshiftDeleteDayBackdrop').onclick = closeWorkshiftDeleteDayModal;
@@ -8101,14 +8157,6 @@ ${error.message || error}`);
         showLoginModal();
       }
     }
-    document.addEventListener('click', event => {
-      const deleteButton = event.target.closest('#workshiftAllDeleteDayBtn');
-      if (deleteButton) {
-        event.preventDefault();
-        event.stopPropagation();
-        openWorkshiftDeleteDayModal();
-      }
-    }, true);
 
     init();
   </script>
