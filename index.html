@@ -5415,56 +5415,105 @@
           </div>`;
       }
       
-      // 2층 (텍스트 필터)
+      // 2층
       if (floor2Rooms.length > 0) {
-        const dirs = [...new Set(floor2Rooms.map(r => r.dir))];
-        // 초기값 설정
-        if (!state.workshiftFloor2DirFilter || !dirs.includes(state.workshiftFloor2DirFilter)) {
-          state.workshiftFloor2DirFilter = dirs[0] || '남';
+        const normalizedRooms = floor2Rooms.map(room => ({
+          ...room,
+          normalizedDir: String(room.dir || '').trim()
+        }));
+
+        const dirs = [...new Set(
+          normalizedRooms
+            .map(room => room.normalizedDir)
+            .filter(Boolean)
+        )];
+
+        // 방향값이 없거나 방향이 하나뿐이면 2층 강의실 전체를 표시합니다.
+        const useDirFilter = dirs.length > 1;
+
+        if (
+          useDirFilter &&
+          (!state.workshiftFloor2DirFilter ||
+           !dirs.includes(state.workshiftFloor2DirFilter))
+        ) {
+          state.workshiftFloor2DirFilter = dirs[0];
         }
-        const filteredRooms = floor2Rooms.filter(r => r.dir === state.workshiftFloor2DirFilter);
-        
+
+        const filteredRooms = useDirFilter
+          ? normalizedRooms.filter(
+              room => room.normalizedDir === state.workshiftFloor2DirFilter
+            )
+          : normalizedRooms;
+
         html += `
-          <div style="margin-bottom: 25px;">
+          <div style="margin-bottom:25px;">
             <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;justify-content:space-between;">
-              <h4 style="margin: 0; font-size: 11pt; font-weight: 600; color: var(--primary);">2층</h4>
-              <div style="display:flex;gap:20px;font-size:10pt;">
-                ${dirs.map(d => {
-                  const active = d === state.workshiftFloor2DirFilter ? ' active' : '';
-                  const color = d === state.workshiftFloor2DirFilter ? 'var(--text)' : 'var(--sub)';
-                  return `<span class="workshift-text-filter${active}" data-workshift-day-floor2-dir="${escapeHtml(d)}" style="cursor:pointer;color:${color};font-weight:${d === state.workshiftFloor2DirFilter ? '700' : '400'};transition:all .2s;">${escapeHtml(d)}</span>`;
-                }).join('')}
-              </div>
+              <h4 style="margin:0;font-size:11pt;font-weight:600;color:var(--primary);">2층</h4>
+              ${useDirFilter ? `
+                <div style="display:flex;gap:20px;font-size:10pt;">
+                  ${dirs.map(d => {
+                    const active = d === state.workshiftFloor2DirFilter ? ' active' : '';
+                    const color = d === state.workshiftFloor2DirFilter ? 'var(--text)' : 'var(--sub)';
+                    return `<span class="workshift-text-filter${active}" data-workshift-day-floor2-dir="${escapeHtml(d)}" style="cursor:pointer;color:${color};font-weight:${d === state.workshiftFloor2DirFilter ? '700' : '400'};transition:all .2s;">${escapeHtml(d)}</span>`;
+                  }).join('')}
+                </div>` : ''}
             </div>
-            ${workshiftPeriodTable(dayLabel, filteredRooms.map(r => r.code))}
+            ${workshiftPeriodTable(
+              dayLabel,
+              filteredRooms.map(room => room.code)
+            )}
           </div>`;
       }
-      
-      // 6층 (텍스트 필터)
+
+      // 6층
       if (floor6Rooms.length > 0) {
-        const dirs = [...new Set(floor6Rooms.map(r => r.dir))];
-        // 초기값 설정
-        if (!state.workshiftFloor6DirFilter || !dirs.includes(state.workshiftFloor6DirFilter)) {
-          state.workshiftFloor6DirFilter = dirs[0] || '남';
+        const normalizedRooms = floor6Rooms.map(room => ({
+          ...room,
+          normalizedDir: String(room.dir || '').trim()
+        }));
+
+        const dirs = [...new Set(
+          normalizedRooms
+            .map(room => room.normalizedDir)
+            .filter(Boolean)
+        )];
+
+        const useDirFilter = dirs.length > 1;
+
+        if (
+          useDirFilter &&
+          (!state.workshiftFloor6DirFilter ||
+           !dirs.includes(state.workshiftFloor6DirFilter))
+        ) {
+          state.workshiftFloor6DirFilter = dirs[0];
         }
-        const filteredRooms = floor6Rooms.filter(r => r.dir === state.workshiftFloor6DirFilter);
-        
+
+        const filteredRooms = useDirFilter
+          ? normalizedRooms.filter(
+              room => room.normalizedDir === state.workshiftFloor6DirFilter
+            )
+          : normalizedRooms;
+
         html += `
-          <div style="margin-bottom: 25px;">
+          <div style="margin-bottom:25px;">
             <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;justify-content:space-between;">
-              <h4 style="margin: 0; font-size: 11pt; font-weight: 600; color: var(--primary);">6층</h4>
-              <div style="display:flex;gap:20px;font-size:10pt;">
-                ${dirs.map(d => {
-                  const active = d === state.workshiftFloor6DirFilter ? ' active' : '';
-                  const color = d === state.workshiftFloor6DirFilter ? 'var(--text)' : 'var(--sub)';
-                  return `<span class="workshift-text-filter${active}" data-workshift-day-floor6-dir="${escapeHtml(d)}" style="cursor:pointer;color:${color};font-weight:${d === state.workshiftFloor6DirFilter ? '700' : '400'};transition:all .2s;">${escapeHtml(d)}</span>`;
-                }).join('')}
-              </div>
+              <h4 style="margin:0;font-size:11pt;font-weight:600;color:var(--primary);">6층</h4>
+              ${useDirFilter ? `
+                <div style="display:flex;gap:20px;font-size:10pt;">
+                  ${dirs.map(d => {
+                    const active = d === state.workshiftFloor6DirFilter ? ' active' : '';
+                    const color = d === state.workshiftFloor6DirFilter ? 'var(--text)' : 'var(--sub)';
+                    return `<span class="workshift-text-filter${active}" data-workshift-day-floor6-dir="${escapeHtml(d)}" style="cursor:pointer;color:${color};font-weight:${d === state.workshiftFloor6DirFilter ? '700' : '400'};transition:all .2s;">${escapeHtml(d)}</span>`;
+                  }).join('')}
+                </div>` : ''}
             </div>
-            ${workshiftPeriodTable(dayLabel, filteredRooms.map(r => r.code))}
+            ${workshiftPeriodTable(
+              dayLabel,
+              filteredRooms.map(room => room.code)
+            )}
           </div>`;
       }
-      
+
       return html;
     }
 
