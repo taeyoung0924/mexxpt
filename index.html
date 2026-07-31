@@ -3879,7 +3879,7 @@
         <button class="workshift-icon-btn" id="workshiftAllTodayBtn" type="button" style="font-size:8pt;white-space:nowrap;">오늘</button>
       </div>
       <div class="workshift-action-group">
-        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" aria-label="선택일 전체 근무 삭제" title="선택일 전체 근무 삭제">🗑️</button>
+        <button class="workshift-icon-btn workshift-delete-day-btn" id="workshiftAllDeleteDayBtn" type="button" onclick="openWorkshiftDeleteDayModal(); return false;" aria-label="선택일 전체 근무 삭제" title="선택일 전체 근무 삭제">🗑️</button>
         <button class="workshift-icon-btn" id="workshiftAllAddBtn" type="button" aria-label="근무 추가" title="근무 추가">+</button>
         <button class="workshift-icon-btn" id="workshiftAllEditBtn" type="button" aria-label="수정" title="수정">✎</button>
         <button class="workshift-icon-btn" id="workshiftAllRoomManageBtn" type="button" aria-label="강의실 관리" title="강의실 관리">🏢</button>
@@ -3916,7 +3916,7 @@
   <section class="panel modal hidden workshift-modal-topmost workshift-delete-day-modal" id="workshiftDeleteDayModal" role="dialog" aria-modal="true" aria-labelledby="workshiftDeleteDayTitle">
     <div class="modal-head">
       <h2 id="workshiftDeleteDayTitle">전체 근무 삭제</h2>
-      <button class="btn btn-secondary" id="closeWorkshiftDeleteDayModalBtn" type="button">닫기</button>
+      <button class="btn btn-secondary" id="closeWorkshiftDeleteDayModalBtn" type="button" onclick="closeWorkshiftDeleteDayModal(); return false;">닫기</button>
     </div>
     <p class="workshift-delete-day-message" id="workshiftDeleteDayMessage">삭제 범위를 선택해주세요.</p>
     <div class="field hidden" id="workshiftDeleteDayPasswordWrap">
@@ -3925,9 +3925,9 @@
       <span class="workshift-delete-day-error hidden" id="workshiftDeleteDayError">암호가 올바르지 않습니다.</span>
     </div>
     <div class="workshift-delete-day-actions workshift-delete-scope-actions">
-      <button class="btn btn-danger" id="confirmWorkshiftDeleteDayBtn" type="button">일 삭제</button>
-      <button class="btn btn-danger" id="confirmWorkshiftDeleteWeekBtn" type="button">주 삭제</button>
-      <button class="btn btn-secondary" id="cancelWorkshiftDeleteDayBtn" type="button">취소</button>
+      <button class="btn btn-danger" id="confirmWorkshiftDeleteDayBtn" type="button" onclick="confirmDeleteAllWorkshiftForSelectedDay(); return false;">일 삭제</button>
+      <button class="btn btn-danger" id="confirmWorkshiftDeleteWeekBtn" type="button" onclick="confirmDeleteAllWorkshiftForSelectedWeek(); return false;">주 삭제</button>
+      <button class="btn btn-secondary" id="cancelWorkshiftDeleteDayBtn" type="button" onclick="closeWorkshiftDeleteDayModal(); return false;">취소</button>
     </div>
   </section>
 
@@ -5958,8 +5958,12 @@
       $('workshiftDeleteDayPasswordWrap').classList.toggle('hidden', isWorkshiftAdminUser());
       $('workshiftDeleteDayPassword').value = '';
       $('workshiftDeleteDayError').classList.add('hidden');
-      $('workshiftDeleteDayBackdrop').classList.remove('hidden');
-      $('workshiftDeleteDayModal').classList.remove('hidden');
+      const backdrop = $('workshiftDeleteDayBackdrop');
+      const modal = $('workshiftDeleteDayModal');
+      backdrop.classList.remove('hidden');
+      modal.classList.remove('hidden');
+      backdrop.style.display = 'block';
+      modal.style.display = 'block';
 
       if (!isWorkshiftAdminUser()) {
         setTimeout(() => $('workshiftDeleteDayPassword').focus(), 50);
@@ -5967,8 +5971,12 @@
     }
 
     function closeWorkshiftDeleteDayModal() {
-      $('workshiftDeleteDayBackdrop').classList.add('hidden');
-      $('workshiftDeleteDayModal').classList.add('hidden');
+      const backdrop = $('workshiftDeleteDayBackdrop');
+      const modal = $('workshiftDeleteDayModal');
+      backdrop.classList.add('hidden');
+      modal.classList.add('hidden');
+      backdrop.style.display = 'none';
+      modal.style.display = 'none';
       $('workshiftDeleteDayPassword').value = '';
       $('workshiftDeleteDayError').classList.add('hidden');
     }
@@ -6061,6 +6069,11 @@ ${error.message || error}`);
     async function confirmDeleteAllWorkshiftForSelectedWeek() {
       await deleteWorkshiftScope('week');
     }
+
+    window.openWorkshiftDeleteDayModal = openWorkshiftDeleteDayModal;
+    window.closeWorkshiftDeleteDayModal = closeWorkshiftDeleteDayModal;
+    window.confirmDeleteAllWorkshiftForSelectedDay = confirmDeleteAllWorkshiftForSelectedDay;
+    window.confirmDeleteAllWorkshiftForSelectedWeek = confirmDeleteAllWorkshiftForSelectedWeek;
 
     function renderWorkshiftAllModal() {
       const weekday = WORKSHIFT_WEEKDAY_LABELS[state.workshiftAllDate.getDay()];
@@ -6410,6 +6423,9 @@ ${error.message || error}`);
   
 /* 선택일 전체 근무 삭제 */
 #workshiftAllDeleteDayBtn {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto !important;
   color: #b42318;
 }
 #workshiftAllDeleteDayBtn:hover {
@@ -8071,6 +8087,15 @@ ${error.message || error}`);
         showLoginModal();
       }
     }
+    document.addEventListener('click', event => {
+      const deleteButton = event.target.closest('#workshiftAllDeleteDayBtn');
+      if (deleteButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        openWorkshiftDeleteDayModal();
+      }
+    }, true);
+
     init();
   </script>
 
