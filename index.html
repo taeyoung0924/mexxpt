@@ -3893,18 +3893,13 @@
   </section>
 
   <!-- 근무표 전체 초기화 확인 -->
-  <div class="backdrop modal-backdrop hidden workshift-modal-topmost" id="workshiftResetAllBackdrop"></div>
-  <section class="panel modal hidden workshift-modal-topmost workshift-delete-day-modal" id="workshiftResetAllModal" role="dialog" aria-modal="true" aria-labelledby="workshiftResetAllTitle">
+  <div class="backdrop modal-backdrop hidden workshift-modal-topmost workshift-reset-front" id="workshiftResetAllBackdrop"></div>
+  <section class="panel modal hidden workshift-modal-topmost workshift-delete-day-modal workshift-reset-front" id="workshiftResetAllModal" role="dialog" aria-modal="true" aria-labelledby="workshiftResetAllTitle">
     <div class="modal-head">
       <h2 id="workshiftResetAllTitle">근무표 전체 초기화</h2>
       <button class="btn btn-secondary" id="closeWorkshiftResetAllModalBtn" type="button">닫기</button>
     </div>
     <p class="workshift-delete-day-message">모든 날짜의 근무계획을 전부 삭제하시겠습니까?<br>삭제한 근무표는 복구할 수 없습니다.</p>
-    <div class="field">
-      <label for="workshiftResetAllPassword">관리자 암호</label>
-      <input type="password" id="workshiftResetAllPassword" inputmode="numeric" maxlength="4" placeholder="암호 4자리">
-      <span class="workshift-delete-day-error hidden" id="workshiftResetAllError">암호가 올바르지 않습니다.</span>
-    </div>
     <div class="workshift-delete-day-actions">
       <button class="btn btn-danger" id="confirmWorkshiftResetAllBtn" type="button">전체 초기화</button>
       <button class="btn btn-secondary" id="cancelWorkshiftResetAllBtn" type="button">취소</button>
@@ -5922,9 +5917,20 @@
       // 한 표로 통합되어 필터 불필요
     }
 
+    function updateWorkshiftResetAdminVisibility() {
+      const panel = document.querySelector('.workshift-reset-panel');
+      if (panel) panel.classList.toggle('hidden', !canResetAllWorkshift());
+    }
+
+    function canResetAllWorkshift() {
+      return Boolean(state.isAdmin || state.currentUser?.role === 'admin');
+    }
+
     function openWorkshiftResetAllModal() {
-      $('workshiftResetAllPassword').value = '';
-      $('workshiftResetAllError').classList.add('hidden');
+      if (!canResetAllWorkshift()) {
+        alert('근무표 전체 초기화는 관리자만 사용할 수 있습니다.');
+        return;
+      }
       $('workshiftResetAllBackdrop').classList.remove('hidden');
       $('workshiftResetAllModal').classList.remove('hidden');
       setTimeout(() => $('workshiftResetAllPassword').focus(), 50);
@@ -5933,15 +5939,13 @@
     function closeWorkshiftResetAllModal() {
       $('workshiftResetAllBackdrop').classList.add('hidden');
       $('workshiftResetAllModal').classList.add('hidden');
-      $('workshiftResetAllPassword').value = '';
-      $('workshiftResetAllError').classList.add('hidden');
+
     }
 
     async function resetAllWorkshiftEntries() {
-      if ($('workshiftResetAllPassword').value !== WORKSHIFT_EDIT_PASSWORD) {
-        $('workshiftResetAllError').classList.remove('hidden');
-        $('workshiftResetAllPassword').focus();
-        $('workshiftResetAllPassword').select();
+      if (!canResetAllWorkshift()) {
+        closeWorkshiftResetAllModal();
+        alert('근무표 전체 초기화는 관리자만 사용할 수 있습니다.');
         return;
       }
 
@@ -6623,6 +6627,15 @@ ${error.message || error}`);
 #workshiftAllDeleteDayBtn::before,
 #workshiftAllDeleteDayBtn::after {
   pointer-events: none !important;
+}
+
+
+/* 근무표 전체 초기화 확인창은 설정창보다 항상 앞에 표시 */
+.workshift-reset-front.modal-backdrop {
+  z-index: 2000 !important;
+}
+.workshift-reset-front.modal {
+  z-index: 2001 !important;
 }
 
 </style>
@@ -7689,10 +7702,6 @@ ${error.message || error}`);
     $('cancelWorkshiftResetAllBtn').onclick = closeWorkshiftResetAllModal;
     $('workshiftResetAllBackdrop').onclick = closeWorkshiftResetAllModal;
     $('confirmWorkshiftResetAllBtn').onclick = resetAllWorkshiftEntries;
-    $('workshiftResetAllPassword').onkeydown = event => {
-      if (event.key === 'Enter') resetAllWorkshiftEntries();
-      if (event.key === 'Escape') closeWorkshiftResetAllModal();
-    };
     // 휴지통 버튼은 HTML의 onclick에서 직접 처리합니다.
     $('closeWorkshiftDeleteDayModalBtn').onclick = closeWorkshiftDeleteDayModal;
     $('cancelWorkshiftDeleteDayBtn').onclick = closeWorkshiftDeleteDayModal;
