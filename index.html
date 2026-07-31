@@ -194,7 +194,7 @@
       font-weight: 600;
       letter-spacing: normal;
     }
-    .sidebar-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; padding-bottom: 0; border-bottom: 0; }
+    .sidebar-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px; padding-bottom: 0; border-bottom: 0; }
     .icon-btn { width: 24px; height: 24px; padding: 0; color: var(--text); background: var(--primary-soft); border: 1px solid var(--line); border-radius: 9999px; font-weight: 600; }
     .mini-list { display: grid; gap: 0; min-width: 0; overflow: hidden; }
     .mini-item {
@@ -6471,9 +6471,11 @@ ${error.message || error}`);
 
     .print-page {
       width: 100%;
-      height: 188mm;
-      max-height: 188mm;
+      height: 190mm;
+      max-height: 190mm;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
       page-break-after: always;
       break-after: page;
       page-break-inside: avoid;
@@ -6485,15 +6487,12 @@ ${error.message || error}`);
       break-after: auto;
     }
 
-    /* 본관과 별관을 각각 A4 가로 한 장에 강제로 맞춤 */
-    .print-page-main .print-table-wrap {
-      zoom: 0.68;
-      width: 147.06% !important;
-    }
-
+    /* 본관 1·2·6층과 별관을 각각 가로 A4 한 장에 표시 */
+    .print-page-main .print-table-wrap,
     .print-page-annex .print-table-wrap {
-      zoom: 0.82;
-      width: 121.96% !important;
+      width: 100% !important;
+      zoom: 1 !important;
+      transform: none !important;
     }
 
     .print-head {
@@ -6502,7 +6501,7 @@ ${error.message || error}`);
       justify-content: space-between;
       gap: 16px;
       margin-bottom: 8px;
-      padding-bottom: 4px;
+      padding-bottom: 2px;
       border-bottom: 1.5px solid #444;
     }
 
@@ -6520,22 +6519,29 @@ ${error.message || error}`);
 
     .print-table-wrap {
       width: 100%;
-      overflow: visible !important;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden !important;
+      display: flex !important;
     }
 
     .print-table-wrap > div,
     .print-table-wrap > div > div {
       width: 100% !important;
+      height: 100% !important;
       min-width: 0 !important;
-      overflow: visible !important;
-      display: block !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
     }
 
     table {
       width: 100% !important;
+      height: 100% !important;
       table-layout: fixed !important;
       border-collapse: collapse !important;
-      font-size: 6.4px !important;
+      font-size: 5.6px !important;
       color: #222 !important;
     }
 
@@ -6549,7 +6555,7 @@ ${error.message || error}`);
     }
 
     thead th {
-      height: 16px !important;
+      height: 4.5mm !important;
       color: #3f3a36 !important;
       font-weight: 700 !important;
       background: #fff7f1 !important;
@@ -6559,24 +6565,38 @@ ${error.message || error}`);
       background: #ffefe3 !important;
     }
 
+    tbody {
+      height: calc(100% - 18mm) !important;
+    }
+
     tbody tr {
-      height: 28px !important;
+      height: 11mm !important;
+      min-height: 11mm !important;
+    }
+
+    tbody td {
+      height: 11mm !important;
     }
 
     th:first-child,
     td:first-child {
-      width: 37px !important;
-      min-width: 37px !important;
-      max-width: 37px !important;
-      font-size: 6.2px !important;
+      width: 8mm !important;
+      min-width: 8mm !important;
+      max-width: 8mm !important;
+      font-size: 5.2px !important;
       font-weight: 700 !important;
       background: #fffaf6 !important;
     }
 
     .workshift-entry-box {
-      display: block !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      height: 100% !important;
       min-height: 0 !important;
-      padding: 2px !important;
+      padding: 1px !important;
       line-height: 1.15 !important;
       background: #fff9f4 !important;
       border: 1px solid #dfcfc3 !important;
@@ -6585,7 +6605,7 @@ ${error.message || error}`);
 
     .workshift-entry-badge {
       color: #d85f16 !important;
-      font-size: 7px !important;
+      font-size: 5px !important;
       font-weight: 750 !important;
     }
 
@@ -6628,9 +6648,6 @@ ${error.message || error}`);
       break-inside: avoid !important;
     }
 
-    .print-table-wrap table {
-      max-height: 172mm !important;
-    }
 
     @media print {
       body {
@@ -6638,6 +6655,29 @@ ${error.message || error}`);
         print-color-adjust: exact;
       }
     }
+
+    @media print {
+      html, body {
+        width: 297mm !important;
+        height: 210mm !important;
+      }
+
+      .print-page {
+        width: 279mm !important;
+        height: 190mm !important;
+      }
+
+      .print-table-wrap {
+        height: 178mm !important;
+      }
+
+      .print-page-main,
+      .print-page-annex {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+      }
+    }
+
   
 /* 선택일 전체 근무 삭제 */
 #workshiftAllDeleteDayBtn {
