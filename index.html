@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MEXX | Playbook Lite</title>
+  <title>MEXX | Team Playbook</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23000000'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial, Helvetica, sans-serif' font-size='34' font-weight='800' fill='%23ffffff'%3EM%3C/text%3E%3C/svg%3E">
   <meta name="theme-color" content="#000000">
   <style>
@@ -3617,7 +3617,7 @@
     <div class="config-grid">
       <div class="field"><label for="loginName">이름</label><input type="text" id="loginName" placeholder="이름"></div>
       <div class="field"><label for="loginPhone">연락처 (뒤 4자리)</label><input type="text" id="loginPhone" placeholder="핸드폰 뒤 4자리 (예: 1234)" maxlength="4"></div>
-      <div class="field"><label for="loginCode">코드</label><input type="password" id="loginCode" placeholder="관리자가 부여한 코드 (4자리)"></div>
+      <div class="field hidden"><label for="loginCode">코드</label><input type="hidden" id="loginCode" value=""></div>
     </div>
     <div id="loginError" style="color:#b42318;font-size:9pt;margin:10px 0;display:none;">입력 정보가 올바르지 않습니다.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
@@ -3671,7 +3671,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
           <div style="display:flex;flex-direction:column;gap:4px;">
             <label style="font-size:8.5pt;color:var(--sub);">코드 (자동 생성)</label>
-            <input type="text" id="userAddCode" placeholder="" readonly style="padding:6px;font-size:9pt;background:var(--input);">
+            <input type="text" id="userAddCode" value="휴대폰 뒤 4자리" readonly style="padding:6px;font-size:9pt;background:var(--input);">
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;">
             <label style="font-size:8.5pt;color:var(--sub);">권한</label>
@@ -3688,7 +3688,7 @@
           </div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn btn-secondary" id="userAddCodeRegenBtn" type="button" style="flex:1;font-size:9pt;">코드 재생성</button>
+          <button class="btn btn-secondary" id="userAddCodeRegenBtn" type="button" style="flex:1;font-size:9pt;">뒤 4자리 사용</button>
           <button class="btn btn-primary" id="userAddSaveBtn" type="button" style="flex:1;font-size:9pt;">추가</button>
           <button class="btn btn-secondary" id="userAddCancelBtn" type="button" style="flex:1;font-size:9pt;">취소</button>
         </div>
@@ -3950,7 +3950,12 @@
     </div>
   </section>
 
-  <script src="./supabase-config.js"></script>
+  <script>
+    window.RSDC_SUPABASE_CONFIG = {
+      url: 'https://hrqrkstoswscuepydewe.supabase.co',
+      key: 'sb_publishable_Y6Pr-gTVVASBCt1vyms_-g_x6kLOyWO'
+    };
+  </script>
 
   <div class="image-lightbox hidden" id="imageLightbox" role="dialog" aria-modal="true" aria-label="원본 이미지 보기">
     <button type="button" class="image-lightbox-close" id="imageLightboxClose" aria-label="닫기">×</button>
@@ -3967,6 +3972,7 @@
     const NOTICE_STORAGE = 'rsdc_faq_notices_v1';
     const SCHEDULE_STORAGE = 'rsdc_faq_schedules_v1';
     const SUPABASE_SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    // 공지·FAQ·일정·강의실·조교·근무표·사용자 데이터를 Supabase와 통합합니다.
     const THEME_STORAGE = 'rsdc_faq_theme_v1';
     const IMPORTANT_PREFIX = '[[IMPORTANT]]';
     const $ = id => document.getElementById(id);
@@ -4936,6 +4942,12 @@
 
     function saveWorkshiftRooms() {
       localStorage.setItem(WORKSHIFT_ROOMS_STORAGE, JSON.stringify(state.workshiftRooms));
+      if (supabaseClient && state.backend === 'supabase') {
+        syncWorkshiftRoomsToSupabase().catch(error => {
+          console.error(error);
+          updateSupabaseStatus(`강의실 동기화 실패: ${error.message || error}`, 'error');
+        });
+      }
     }
 
     function workshiftAllRoomCodes() {
@@ -5047,6 +5059,12 @@
 
     function saveWorkshiftEntries() {
       localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify(state.workshiftEntries));
+      if (supabaseClient && state.backend === 'supabase') {
+        syncWorkshiftEntriesToSupabase().catch(error => {
+          console.error(error);
+          updateSupabaseStatus(`근무표 동기화 실패: ${error.message || error}`, 'error');
+        });
+      }
     }
 
     function loadWorkshiftTaProfiles() {
@@ -5060,6 +5078,157 @@
 
     function saveWorkshiftTaProfiles() {
       localStorage.setItem(WORKSHIFT_TA_STORAGE, JSON.stringify(state.workshiftTaProfiles));
+      if (supabaseClient && state.backend === 'supabase') {
+        syncWorkshiftAssistantsToSupabase().catch(error => {
+          console.error(error);
+          updateSupabaseStatus(`조교 정보 동기화 실패: ${error.message || error}`, 'error');
+        });
+      }
+    }
+
+    function normalizeDbTime(value) {
+      return String(value || '').slice(0, 5);
+    }
+
+    async function loadRemoteWorkshiftData() {
+      if (!supabaseClient || state.backend !== 'supabase') return false;
+
+      const [
+        { data: roomRows, error: roomError },
+        { data: assistantRows, error: assistantError },
+        { data: entryRows, error: entryError }
+      ] = await Promise.all([
+        supabaseClient.from('mexx_rooms').select('*').eq('is_active', true).order('sort_order').order('code'),
+        supabaseClient.from('mexx_assistants').select('*').eq('is_active', true).order('name'),
+        supabaseClient.from('mexx_workshift_entries').select('*').order('day').order('room').order('start_time')
+      ]);
+
+      if (roomError) throw roomError;
+      if (assistantError) throw assistantError;
+      if (entryError) throw entryError;
+
+      if ((roomRows || []).length) {
+        state.workshiftRooms = roomRows.map(row => ({
+          code: row.code,
+          floor: row.floor || '',
+          dir: row.dir || '',
+          building: row.building || '본관'
+        }));
+      } else {
+        await syncWorkshiftRoomsToSupabase();
+      }
+
+      if ((assistantRows || []).length) {
+        state.workshiftTaProfiles = Object.fromEntries(
+          assistantRows.map(row => [row.name, { phone: row.phone || '', note: row.note || '' }])
+        );
+      } else {
+        await syncWorkshiftAssistantsToSupabase();
+      }
+
+      if ((entryRows || []).length) {
+        state.workshiftEntries = entryRows.map(row => ({
+          id: row.id,
+          room: row.room,
+          day: row.day || '',
+          start: normalizeDbTime(row.start_time),
+          end: normalizeDbTime(row.end_time),
+          className: row.class_name || '',
+          grade: row.grade || '',
+          teacher: row.teacher || '',
+          ta: row.assistant_name || '',
+          memo: row.memo || ''
+        }));
+      } else {
+        await syncWorkshiftEntriesToSupabase();
+      }
+
+      localStorage.setItem(WORKSHIFT_ROOMS_STORAGE, JSON.stringify(state.workshiftRooms));
+      localStorage.setItem(WORKSHIFT_TA_STORAGE, JSON.stringify(state.workshiftTaProfiles));
+      localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify(state.workshiftEntries));
+      updateSupabaseStatus('Supabase 연결됨 · 공지/FAQ/근무표 동기화 완료', 'connected');
+      return true;
+    }
+
+    async function syncWorkshiftRoomsToSupabase() {
+      if (!supabaseClient || state.backend !== 'supabase') return;
+      const rows = state.workshiftRooms.map((room, index) => ({
+        code: room.code,
+        floor: room.floor || '',
+        dir: room.dir || '',
+        building: room.building || '본관',
+        sort_order: index,
+        is_active: true
+      }));
+      if (rows.length) {
+        const { error } = await supabaseClient.from('mexx_rooms').upsert(rows, { onConflict: 'code' });
+        if (error) throw error;
+      }
+      const { data: remote, error: readError } = await supabaseClient.from('mexx_rooms').select('code');
+      if (readError) throw readError;
+      const keep = new Set(rows.map(row => row.code));
+      for (const row of remote || []) {
+        if (!keep.has(row.code)) {
+          const { error } = await supabaseClient.from('mexx_rooms').delete().eq('code', row.code);
+          if (error) throw error;
+        }
+      }
+    }
+
+    async function syncWorkshiftAssistantsToSupabase() {
+      if (!supabaseClient || state.backend !== 'supabase') return;
+      const rows = Object.entries(state.workshiftTaProfiles || {}).map(([name, profile]) => ({
+        name,
+        phone: profile?.phone || '',
+        note: profile?.note || '',
+        is_active: true
+      }));
+      if (rows.length) {
+        const { error } = await supabaseClient.from('mexx_assistants').upsert(rows, { onConflict: 'name' });
+        if (error) throw error;
+      }
+      const { data: remote, error: readError } = await supabaseClient.from('mexx_assistants').select('name');
+      if (readError) throw readError;
+      const keep = new Set(rows.map(row => row.name));
+      for (const row of remote || []) {
+        if (!keep.has(row.name)) {
+          const { error } = await supabaseClient.from('mexx_assistants').delete().eq('name', row.name);
+          if (error) throw error;
+        }
+      }
+    }
+
+    async function syncWorkshiftEntriesToSupabase() {
+      if (!supabaseClient || state.backend !== 'supabase') return;
+      const currentUserName = state.currentUser?.name || '';
+      const rows = state.workshiftEntries.map(entry => ({
+        id: entry.id,
+        room: entry.room,
+        day: entry.day || '',
+        work_date: entry.workDate || null,
+        start_time: entry.start,
+        end_time: entry.end,
+        class_name: entry.className || '',
+        grade: entry.grade || '',
+        teacher: entry.teacher || '',
+        assistant_name: entry.ta || '',
+        memo: entry.memo || '',
+        created_by: entry.createdBy || currentUserName,
+        updated_by: currentUserName
+      }));
+      if (rows.length) {
+        const { error } = await supabaseClient.from('mexx_workshift_entries').upsert(rows, { onConflict: 'id' });
+        if (error) throw error;
+      }
+      const { data: remote, error: readError } = await supabaseClient.from('mexx_workshift_entries').select('id');
+      if (readError) throw readError;
+      const keep = new Set(rows.map(row => row.id));
+      for (const row of remote || []) {
+        if (!keep.has(row.id)) {
+          const { error } = await supabaseClient.from('mexx_workshift_entries').delete().eq('id', row.id);
+          if (error) throw error;
+        }
+      }
     }
 
     function workshiftToMinutes(t) {
@@ -6099,7 +6268,7 @@
       const code = $('workshiftNewRoomCode').value.trim();
       if (!floor || !dir || !code) { alert('층, 방향, 강의실 코드를 모두 입력해 주세요.'); return; }
       if (state.workshiftRooms.some(room => room.code === code)) { alert('이미 존재하는 강의실 코드입니다.'); return; }
-      state.workshiftRooms.push({ floor, dir, code });
+      state.workshiftRooms.push({ floor, dir, code, building: state.workshiftAllBuilding || state.workshiftBuilding || '본관' });
       saveWorkshiftRooms();
       $('workshiftNewRoomFloor').value = '';
       $('workshiftNewRoomDir').value = '';
@@ -7169,19 +7338,31 @@
 
     // ===== 로그인/사용자 관리 =====
     function generateCode() {
-      return String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+      return '';
     }
 
-    function loadUsers() {
+    async function loadUsers() {
+      if (supabaseClient && state.backend === 'supabase') {
+        const { data, error } = await supabaseClient.rpc('mexx_admin_list_users', { admin_pin: ADMIN_PASSWORD });
+        if (error) {
+          console.error(error);
+          state.users = [];
+          return;
+        }
+        state.users = (data || []).map(row => ({
+          id: row.id,
+          name: row.name,
+          phone: row.phone,
+          code: '',
+          memo: row.memo || '',
+          role: row.role || 'user',
+          isActive: row.is_active !== false
+        }));
+        localStorage.setItem(USERS_STORAGE, JSON.stringify(state.users));
+        return;
+      }
       try {
         state.users = JSON.parse(localStorage.getItem(USERS_STORAGE) || '[]');
-        // 기본 테스트 사용자 생성 (첫 실행시만)
-        if (state.users.length === 0) {
-          state.users = [
-            { id: makeId('user'), name: '테스트', phone: '010-0000-1234', code: '1234', memo: '테스트 사용자', role: 'user' }
-          ];
-          saveUsers();
-        }
       } catch {
         state.users = [];
       }
@@ -7189,6 +7370,38 @@
 
     function saveUsers() {
       localStorage.setItem(USERS_STORAGE, JSON.stringify(state.users));
+    }
+
+    async function upsertRemoteUser(user) {
+      if (!supabaseClient || state.backend !== 'supabase') {
+        saveUsers();
+        return user.id;
+      }
+      const { data, error } = await supabaseClient.rpc('mexx_admin_upsert_user', {
+        admin_pin: ADMIN_PASSWORD,
+        user_id: /^[0-9a-f-]{36}$/i.test(String(user.id || '')) ? user.id : null,
+        user_name: user.name,
+        user_phone: user.phone,
+        user_role: user.role || 'user',
+        user_memo: user.memo || '',
+        user_active: user.isActive !== false
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    async function deleteRemoteUsers(ids) {
+      if (!supabaseClient || state.backend !== 'supabase') {
+        saveUsers();
+        return;
+      }
+      const uuidIds = ids.filter(id => /^[0-9a-f-]{36}$/i.test(String(id)));
+      if (!uuidIds.length) return;
+      const { error } = await supabaseClient.rpc('mexx_admin_delete_users', {
+        admin_pin: ADMIN_PASSWORD,
+        user_ids: uuidIds
+      });
+      if (error) throw error;
     }
 
     function loadLoginSession() {
@@ -7253,41 +7466,56 @@
       $('loginBackdrop').classList.add('hidden');
     }
 
-    $('loginSubmitBtn').onclick = () => {
+    $('loginSubmitBtn').onclick = async () => {
       const name = $('loginName').value.trim();
-      const phone = $('loginPhone').value.trim();
-      const code = $('loginCode').value.trim();
+      const phone = $('loginPhone').value.replace(/[^0-9]/g, '').slice(-4);
 
-      if (!name || !phone || !code) {
+      if (!name || phone.length !== 4) {
         $('loginError').style.display = 'block';
         return;
       }
 
-      // 관리자 로그인 체크
-      if (name === '관리자' && phone === '0000' && code === ADMIN_PASSWORD) {
-        saveLoginSession({ name: '관리자', phone: '0000' }, true);
+      if (name === '관리자' && phone === '0000') {
+        saveLoginSession({ name: '관리자', phone: '0000', role: 'admin' }, true);
         hideLoginModal();
         renderAll();
         return;
       }
 
-      // 일반 사용자 로그인
-      const user = state.users.find(u => 
-        u.name === name && 
-        u.phone.slice(-4) === phone && 
-        u.code === code
-      );
-
-      if (user) {
-        saveLoginSession({ name: user.name, phone: user.phone }, false);
+      try {
+        if (!supabaseClient || state.backend !== 'supabase') {
+          throw new Error('Supabase에 연결되지 않았습니다.');
+        }
+        const { data, error } = await supabaseClient.rpc('mexx_login', {
+          login_name: name,
+          login_last4: phone
+        });
+        if (error) throw error;
+        const user = Array.isArray(data) ? data[0] : data;
+        if (!user) {
+          $('loginError').style.display = 'block';
+          return;
+        }
+        saveLoginSession({ id: user.id, name: user.name, role: user.role }, user.role === 'admin');
+        try {
+          await supabaseClient.rpc('mexx_write_access_log', {
+            log_user_id: user.id,
+            log_user_name: user.name,
+            log_action: 'login',
+            log_detail: { source: 'web' }
+          });
+        } catch (logError) {
+          console.warn('접속 로그 저장 실패', logError);
+        }
         hideLoginModal();
         renderAll();
-      } else {
+      } catch (error) {
+        console.error(error);
         $('loginError').style.display = 'block';
       }
     };
 
-    [$('loginName'), $('loginPhone'), $('loginCode')].forEach(input => {
+    [$('loginName'), $('loginPhone')].forEach(input => {
       input.addEventListener('keydown', e => {
         if (e.key === 'Enter') $('loginSubmitBtn').click();
       });
@@ -7301,7 +7529,7 @@
     function showUserAddModal() {
       $('userAddName').value = '';
       $('userAddPhone').value = '';
-      $('userAddCode').value = generateCode();
+      $('userAddCode').value = '';
       $('userAddMemo').value = '';
       $('userAddRole').value = 'user';
       $('userAddFormContainer').style.display = 'block';
@@ -7312,27 +7540,34 @@
     }
 
     $('userAddCodeRegenBtn').onclick = () => {
-      $('userAddCode').value = generateCode();
+      $('userAddCode').value = '';
     };
 
     $('userAddCancelBtn').onclick = closeUserAddModal;
 
-    $('userAddSaveBtn').onclick = () => {
+    $('userAddSaveBtn').onclick = async () => {
       const name = $('userAddName').value.trim();
       const phone = $('userAddPhone').value.trim();
-      const code = $('userAddCode').value.trim();
       const memo = $('userAddMemo').value.trim();
       const role = $('userAddRole').value;
 
-      if (!name || !phone || !code) {
-        alert('모든 항목을 입력해주세요.');
+      if (!name || phone.replace(/[^0-9]/g, '').length < 4) {
+        alert('이름과 연락처를 정확히 입력해주세요.');
         return;
       }
 
-      state.users.push({ id: makeId('user'), name, phone, code, memo, role });
-      saveUsers();
-      renderUserManagement();
-      closeUserAddModal();
+      try {
+        const tempUser = { id: makeId('user'), name, phone, code: '', memo, role, isActive: true };
+        const savedId = await upsertRemoteUser(tempUser);
+        tempUser.id = savedId || tempUser.id;
+        state.users.push(tempUser);
+        saveUsers();
+        renderUserManagement();
+        closeUserAddModal();
+      } catch (error) {
+        console.error(error);
+        alert(`사용자 저장 실패: ${error.message || error}`);
+      }
     };
 
     // 사용자 관리 - 렌더링
@@ -7347,7 +7582,7 @@
             <td style="padding:8px;">${idx + 1}</td>
             <td style="padding:8px;">${escapeHtml(user.name)}</td>
             <td style="padding:8px;">${escapeHtml(user.phone)}</td>
-            <td style="padding:8px;"><code>${escapeHtml(user.code)}</code></td>
+            <td style="padding:8px;"><code>${escapeHtml(String(user.phone || '').replace(/[^0-9]/g, '').slice(-4))}</code></td>
             <td style="padding:8px;">${getRoleLabel(user.role || 'user')}</td>
             <td style="padding:8px;"></td>
             <td style="padding:8px;"></td>
@@ -7369,7 +7604,7 @@
             <td style="padding:8px;">${idx + 1}</td>
             <td style="padding:8px;">${escapeHtml(user.name)}</td>
             <td style="padding:8px;">${escapeHtml(user.phone)}</td>
-            <td style="padding:8px;"><code>${escapeHtml(user.code)}</code></td>
+            <td style="padding:8px;"><code>${escapeHtml(String(user.phone || '').replace(/[^0-9]/g, '').slice(-4))}</code></td>
             <td style="padding:8px;"><span style="font-size:8.5pt;${user.role === 'admin' ? 'color:var(--danger);font-weight:600;' : ''}">${getRoleLabel(user.role || 'user')}</span></td>
             <td style="padding:8px;">
               <div style="display:flex;gap:4px;align-items:center;">
@@ -7383,9 +7618,12 @@
         document.querySelectorAll('.user-delete-btn').forEach(btn => {
           btn.onclick = () => {
             if (confirm('이 사용자를 삭제하시겠습니까?')) {
-              state.users = state.users.filter(u => u.id !== btn.dataset.userId);
-              saveUsers();
-              renderUserManagement();
+              const targetId = btn.dataset.userId;
+              deleteRemoteUsers([targetId]).then(() => {
+                state.users = state.users.filter(u => u.id !== targetId);
+                saveUsers();
+                renderUserManagement();
+              }).catch(error => alert(`사용자 삭제 실패: ${error.message || error}`));
             }
           };
         });
@@ -7396,7 +7634,7 @@
             const user = state.users.find(u => u.id === btn.dataset.userId);
             if (user) {
               user.memo = input.value;
-              saveUsers();
+              upsertRemoteUser(user).then(() => saveUsers()).catch(error => alert(`메모 저장 실패: ${error.message || error}`));
               btn.textContent = '저장';
               setTimeout(() => { btn.textContent = '✎'; }, 1500);
             }
@@ -7416,15 +7654,21 @@
 
     $('userMgmtAddBtn').onclick = showUserAddModal;
 
-    $('userMgmtDeleteSelectedBtn').onclick = () => {
+    $('userMgmtDeleteSelectedBtn').onclick = async () => {
       if (state.userDeleteSelection.size === 0) {
         alert('선택된 사용자가 없습니다.');
         return;
       }
       if (!confirm(`${state.userDeleteSelection.size}명의 사용자를 삭제하시겠습니까?`)) return;
       
-      state.users = state.users.filter(u => !state.userDeleteSelection.has(u.id));
-      saveUsers();
+      try {
+        await deleteRemoteUsers([...state.userDeleteSelection]);
+        state.users = state.users.filter(u => !state.userDeleteSelection.has(u.id));
+        saveUsers();
+      } catch (error) {
+        alert(`사용자 삭제 실패: ${error.message || error}`);
+        return;
+      }
       state.userDeleteSelection.clear();
       state.userDeleteMode = false;
       $('userMgmtDeleteModeBtn').textContent = '−';
@@ -7457,8 +7701,8 @@
       $('adminTabUsers').style.color = 'var(--text)';
     };
 
-    $('adminTabUsers').onclick = () => {
-      loadUsers();
+    $('adminTabUsers').onclick = async () => {
+      await loadUsers();
       renderUserManagement();
       $('trashSettingsPanel').style.display = 'none';
       $('userManagementPanel').style.display = 'block';
@@ -7477,25 +7721,19 @@
 
     async function init() {
       applyTheme(localStorage.getItem(THEME_STORAGE) || 'light');
-      loadUsers();
       loadLocalData();
       loadWorkshiftRooms();
       loadWorkshiftEntries();
       loadWorkshiftTaProfiles();
-      
-      // 로그인 확인 및 처리
-      const isLoggedIn = loadLoginSession();
-      
-      // 항상 renderAll() 호출
-      renderAll();
-      
-      // 로그인 상태에 따라 모달 표시/숨김
-      if (isLoggedIn) {
-        hideLoginModal();
-      } else {
-        showLoginModal();
+      try {
+        state.users = JSON.parse(localStorage.getItem(USERS_STORAGE) || '[]');
+      } catch {
+        state.users = [];
       }
-      
+
+      const isLoggedIn = loadLoginSession();
+      renderAll();
+
       if (window.innerWidth > 980) {
         $('workshiftCard').classList.remove('hidden');
         $('workshiftToggleBtn').setAttribute('aria-expanded', 'true');
@@ -7504,7 +7742,25 @@
         $('workshiftToggleBtn').setAttribute('aria-expanded', 'false');
       }
       renderWorkshift();
-      loadData();
+
+      const connected = await loadData();
+      if (connected && state.backend === 'supabase') {
+        try {
+          await loadRemoteWorkshiftData();
+          await loadUsers();
+          renderWorkshift();
+          renderAll();
+        } catch (error) {
+          console.error(error);
+          updateSupabaseStatus(`근무표/사용자 불러오기 실패: ${error.message || error}`, 'error');
+        }
+      }
+
+      if (isLoggedIn) {
+        hideLoginModal();
+      } else {
+        showLoginModal();
+      }
     }
     init();
   </script>
