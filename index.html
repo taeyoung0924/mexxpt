@@ -5103,9 +5103,9 @@
     function loadWorkshiftEntries() {
       try {
         const saved = JSON.parse(localStorage.getItem(WORKSHIFT_STORAGE) || 'null');
-        state.workshiftEntries = Array.isArray(saved) ? saved : WORKSHIFT_SAMPLE_ENTRIES.slice();
+        state.workshiftEntries = Array.isArray(saved) ? saved : [];
       } catch (e) {
-        state.workshiftEntries = WORKSHIFT_SAMPLE_ENTRIES.slice();
+        state.workshiftEntries = [];
       }
     }
 
@@ -5178,22 +5178,21 @@
         await syncWorkshiftAssistantsToSupabase();
       }
 
-      if ((entryRows || []).length) {
-        state.workshiftEntries = entryRows.map(row => ({
-          id: row.id,
-          room: row.room,
-          day: row.day || '',
-          start: normalizeDbTime(row.start_time),
-          end: normalizeDbTime(row.end_time),
-          className: row.class_name || '',
-          grade: row.grade || '',
-          teacher: row.teacher || '',
-          ta: row.assistant_name || '',
-          memo: row.memo || ''
-        }));
-      } else {
-        await syncWorkshiftEntriesToSupabase();
-      }
+      // Supabase가 비어 있으면 '초기화된 상태'로 인정합니다.
+      // 내장 샘플 데이터를 다시 업로드하지 않습니다.
+      state.workshiftEntries = (entryRows || []).map(row => ({
+        id: row.id,
+        room: row.room,
+        day: row.day || '',
+        workDate: row.work_date || '',
+        start: normalizeDbTime(row.start_time),
+        end: normalizeDbTime(row.end_time),
+        className: row.class_name || '',
+        grade: row.grade || '',
+        teacher: row.teacher || '',
+        ta: row.assistant_name || '',
+        memo: row.memo || ''
+      }));
 
       localStorage.setItem(WORKSHIFT_ROOMS_STORAGE, JSON.stringify(state.workshiftRooms));
       localStorage.setItem(WORKSHIFT_TA_STORAGE, JSON.stringify(state.workshiftTaProfiles));
@@ -5968,8 +5967,21 @@
           if (error) throw error;
         }
 
+        if (supabaseClient && state.backend === 'supabase') {
+          const { data: remainingRows, error: verifyError } = await supabaseClient
+            .from('mexx_workshift_entries')
+            .select('id')
+            .limit(1);
+
+          if (verifyError) throw verifyError;
+          if ((remainingRows || []).length) {
+            throw new Error('Supabase 근무표 데이터가 완전히 삭제되지 않았습니다.');
+          }
+        }
+
         state.workshiftEntries = [];
         localStorage.setItem(WORKSHIFT_STORAGE, JSON.stringify([]));
+        localStorage.setItem('mexx_workshift_reset_complete_v1', 'true');
 
         renderWorkshift();
 
