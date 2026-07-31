@@ -5719,14 +5719,15 @@
     }
 
     // 같은 근무(강의) 하나를 시간·강사·조교를 담은 박스로 표시합니다. 마우스 오버 시 연필 아이콘으로 바로 수정할 수 있습니다.
-    function workshiftEntryBoxHtml(entry, rowSpan = 1) {
+    function workshiftEntryBoxHtml(entry, rowSpan = 1, pixelHeight = 44) {
       const badge = [entry.grade, entry.className].filter(Boolean).join(' · ');
       const safeRowSpan = Math.max(1, Number(rowSpan) || 1);
+      const safePixelHeight = Math.max(44, Number(pixelHeight) || 44);
       const nameHtml = state.workshiftEditMode
         ? `<span class="workshift-chip" data-workshift-edit="${entry.id}">${escapeHtml(entry.ta || '-')}<button class="workshift-chip-del" type="button" data-workshift-delete="${entry.id}" aria-label="삭제">×</button></span>`
         : `<button class="workshift-name-btn" type="button" data-workshift-ta="${escapeHtml(entry.ta || '')}">${escapeHtml(entry.ta || '-')}</button>`;
       return `
-        <div class="workshift-entry-box" data-row-span="${safeRowSpan}">
+        <div class="workshift-entry-box" data-row-span="${safeRowSpan}" style="height:${safePixelHeight}px;min-height:${safePixelHeight}px;">
           <button class="workshift-entry-quick-edit" type="button" data-workshift-quick-edit="${entry.id}" aria-label="근무 수정" title="수정">✎</button>
           ${badge ? `<div class="workshift-entry-badge">${escapeHtml(badge)}</div>` : ''}
           ${entry.teacher ? `<div class="workshift-entry-teacher">${escapeHtml(entry.teacher)}</div>` : ''}
@@ -5855,7 +5856,16 @@
               else break;
             }
             const tip = workshiftCellTooltip([covering]);
-            bodyRows += `<td class="workshift-entry-cell"${span > 1 ? ` rowspan="${span}"` : ''}${tip ? ` title="${escapeHtml(tip)}"` : ''} style="${borderStyle}">${workshiftEntryBoxHtml(covering, span)}</td>`;
+            const durationMinutes = Math.max(
+              30,
+              workshiftToMinutes(covering.end) - workshiftToMinutes(covering.start)
+            );
+            const rowHeightPx = 50;
+            const cardHeightPx = Math.max(
+              44,
+              Math.round((durationMinutes / 60) * rowHeightPx - 6)
+            );
+            bodyRows += `<td class="workshift-entry-cell"${span > 1 ? ` rowspan="${span}"` : ''}${tip ? ` title="${escapeHtml(tip)}"` : ''} style="${borderStyle}">${workshiftEntryBoxHtml(covering, span, cardHeightPx)}</td>`;
           }
         }
         bodyRows += '</tr>';
@@ -6462,19 +6472,26 @@ ${error.message || error}`);
 .workshift-reset-panel p{margin:0;color:var(--sub);font-size:9pt;line-height:1.5}
 @media(max-width:620px){.workshift-reset-panel{align-items:stretch;flex-direction:column}}
 
-/* 전체 시간표 근무 카드: 시작선부터 종료선까지 셀을 완전히 채움 */
+/* 전체 시간표 근무 카드: 시간 길이에 맞춘 픽셀 높이 */
+#workshiftAllModal .workshift-all-rooms-table tbody tr {
+  height: 50px !important;
+  min-height: 50px !important;
+}
+#workshiftAllModal .workshift-all-rooms-table tbody td {
+  height: 50px !important;
+  min-height: 50px !important;
+}
 #workshiftAllModal .workshift-all-rooms-table td.workshift-entry-cell {
   position: relative !important;
   padding: 3px !important;
-  vertical-align: stretch !important;
+  vertical-align: top !important;
   overflow: visible !important;
 }
 #workshiftAllModal .workshift-all-rooms-table td.workshift-entry-cell > .workshift-entry-box {
-  position: absolute !important;
-  inset: 3px !important;
-  width: auto !important;
-  height: auto !important;
-  min-height: 0 !important;
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
   margin: 0 !important;
   padding: 7px 6px !important;
   display: flex !important;
@@ -6483,9 +6500,6 @@ ${error.message || error}`);
   justify-content: center !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
-}
-#workshiftAllModal .workshift-all-rooms-table td.workshift-entry-cell[rowspan] > .workshift-entry-box {
-  bottom: 3px !important;
 }
 .workshift-delete-scope-actions {
   display: grid !important;
