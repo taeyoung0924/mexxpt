@@ -107,7 +107,7 @@
     .sidebar { min-width: 0; overflow: hidden; }
     .content { display: grid; min-width: 0; align-content: start; gap: 12px; }
     h1, h2, h3, p { margin-top: 0; }
-    h1, h2, h3 { margin-bottom: 8px; font-weight: 600; letter-spacing: normal; }
+    h1, h2, h3 { margin-bottom: 4px; font-weight: 600; letter-spacing: normal; }
     .muted { color: var(--sub); }
 
     .sidebar-brand {
@@ -2935,7 +2935,7 @@
 }
 
 #workshiftAllModal .workshift-floor-btn {
-  min-height: 28px !important;
+  min-height: 21px !important;
   padding: 4px 11px !important;
   color: #756d67 !important;
   background: #fff !important;
@@ -6459,13 +6459,29 @@ ${error.message || error}`);
 
     .print-page {
       width: 100%;
+      height: 188mm;
+      max-height: 188mm;
+      overflow: hidden;
       page-break-after: always;
       break-after: page;
+      page-break-inside: avoid;
+      break-inside: avoid-page;
     }
 
     .print-page:last-child {
       page-break-after: auto;
       break-after: auto;
+    }
+
+    /* 본관과 별관을 각각 A4 가로 한 장에 강제로 맞춤 */
+    .print-page-main .print-table-wrap {
+      zoom: 0.68;
+      width: 147.06% !important;
+    }
+
+    .print-page-annex .print-table-wrap {
+      zoom: 0.82;
+      width: 121.96% !important;
     }
 
     .print-head {
@@ -6474,18 +6490,18 @@ ${error.message || error}`);
       justify-content: space-between;
       gap: 16px;
       margin-bottom: 8px;
-      padding-bottom: 7px;
+      padding-bottom: 4px;
       border-bottom: 1.5px solid #444;
     }
 
     .print-title {
       margin: 0;
-      font-size: 17px;
+      font-size: 14px;
       font-weight: 750;
     }
 
     .print-date {
-      font-size: 11px;
+      font-size: 9px;
       font-weight: 600;
       white-space: nowrap;
     }
@@ -6507,12 +6523,12 @@ ${error.message || error}`);
       width: 100% !important;
       table-layout: fixed !important;
       border-collapse: collapse !important;
-      font-size: 7.2px !important;
+      font-size: 6.4px !important;
       color: #222 !important;
     }
 
     th, td {
-      padding: 2px 2px !important;
+      padding: 1px 1px !important;
       text-align: center !important;
       vertical-align: middle !important;
       border: 1px solid #b8b8b8 !important;
@@ -6521,7 +6537,7 @@ ${error.message || error}`);
     }
 
     thead th {
-      height: 20px !important;
+      height: 16px !important;
       color: #3f3a36 !important;
       font-weight: 700 !important;
       background: #fff7f1 !important;
@@ -6540,7 +6556,7 @@ ${error.message || error}`);
       width: 37px !important;
       min-width: 37px !important;
       max-width: 37px !important;
-      font-size: 7px !important;
+      font-size: 6.2px !important;
       font-weight: 700 !important;
       background: #fffaf6 !important;
     }
@@ -6566,7 +6582,7 @@ ${error.message || error}`);
     .workshift-entry-time,
     .workshift-name-btn {
       color: #222 !important;
-      font-size: 6.6px !important;
+      font-size: 5.8px !important;
       line-height: 1.15 !important;
       text-decoration: none !important;
       border: 0 !important;
@@ -6586,6 +6602,22 @@ ${error.message || error}`);
       margin: 0 !important;
       padding: 0 !important;
       background: transparent !important;
+    }
+
+
+    .print-table-wrap,
+    .print-table-wrap table,
+    .print-table-wrap thead,
+    .print-table-wrap tbody,
+    .print-table-wrap tr,
+    .print-table-wrap th,
+    .print-table-wrap td {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    .print-table-wrap table {
+      max-height: 172mm !important;
     }
 
     @media print {
@@ -6725,7 +6757,7 @@ ${error.message || error}`);
 </style>
 </head>
 <body>
-  <section class="print-page">
+  <section class="print-page print-page-main">
     <div class="print-head">
       <h1 class="print-title">전체 강의실 근무표 · 본관 1부</h1>
       <div class="print-date">${dateLabel}</div>
@@ -6733,7 +6765,7 @@ ${error.message || error}`);
     <div class="print-table-wrap">${mainTable}</div>
   </section>
 
-  <section class="print-page">
+  <section class="print-page print-page-annex">
     <div class="print-head">
       <h1 class="print-title">전체 강의실 근무표 · 별관 1부</h1>
       <div class="print-date">${dateLabel}</div>
